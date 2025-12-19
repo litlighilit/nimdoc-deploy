@@ -1,5 +1,6 @@
 name: nimdoc-deploy
-description: Reusable action template based on .github/workflows/docs.yml
+description: setup nim & run nimble command(e.g. nimble doc ...) to build document & deploy to pages
+author: litlighilit
 inputs:
   nim-version:
     description: Nim version to install
@@ -22,7 +23,7 @@ inputs:
     default: ${{ github.event.repository.name }}
   nimble-doc-cmd:
     description: cmd to generate doc, on inputs.deploy-dir
-    default: "DEFVAL"
+    required: false
 
 runs:
   using: composite
@@ -51,7 +52,7 @@ runs:
           homepage="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
         fi
         echo homepage="$homepage" >> $GITHUB_ENV
-        if [ "$cmd" = "DEFVAL" ]; then
+        if [ -z "$cmd" ]; then
           nimble doc --index:on --project "${{ inputs.git-url-arg }}" --outdir:${{ inputs.deploy-dir }} -d:homepage="${{ env.homepage }}" src/`echo ${{ inputs.proj-name }} | tr - _`
         else
           $cmd
