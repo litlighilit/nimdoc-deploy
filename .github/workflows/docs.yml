@@ -1,0 +1,73 @@
+name: docs
+
+# yamllint disable-line rule:truthy
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - v*.*
+  workflow_dispatch:
+
+env:
+  nim-version: 'stable'
+  git-url-arg: --git.url:https://github.com/${{ github.repository }} --git.commit:master
+  deploy-dir: .gh-pages
+  lib-deploy-dir: .gh-pages/Lib
+jobs:
+  build-docs:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Cache nimble
+      id: cache-nimble
+      uses: actions/cache@v4
+      with:
+          path: ~/.nimble
+          key: ${{ runner.os }}-nimble-v2
+    - uses: jiro4989/setup-nim-action@v2
+      with:
+        nim-version: ${{ env.nim-version }}
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+    - name: genDoc
+      run: nimble doc --index:on --project ${{ env.git-url-arg }} --outdir:${{ env.deploy-dir }} -d:homepage="${{ github.event.repository.homepage }}" src/nimdoc_deploy
+    - name: "Copy to index.html"
+      run: |
+        cd ${{ env.deploy-dir }}
+        index_file=${{ github.event.repository.name }}.html
+        index_file=`echo $index_file | tr - _`  # subs - with _
+        # package name is not prefixed with 'nim',
+        # in case repo name is prefixed.
+        [ -f $index_file ] || index_file=${index_file#nim}
+        cp $index_file index.html
+        cd $OLDPWD
+
+    - name: "CNAME"
+      run: |
+        cname=$(echo ${{ github.event.repository.homepage }} | grep -oP 'https?://\K[^/]+')
+        echo -n $cname > ${{ env.deploy-dir }}/CNAME
+
+    - name: Upload Artifact
+      #if: github.ref == 'refs/heads/main'
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: ${{ env.deploy-dir }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-docs
+
+    permissions:
+      pages: write
+      id-token: write
+    
+    environment:
+      # environment created automatically by GitHub
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+    - name: Deploy documents
+      id: deployment
+      uses: actions/deploy-pages@v4
+
